@@ -275,6 +275,8 @@ func main() {
 		// Update the map with the modified data
 		records[bootTime] = data
 
+		log.Printf("\ntime:%s", bootTime)
+
 		// Save the updated traffic data
 		err = saveTrafficData(config.DataFile, records)
 		if err != nil {
