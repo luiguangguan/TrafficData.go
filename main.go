@@ -253,8 +253,10 @@ func handleGetTotalTraffic(records *TrafficRecords) http.HandlerFunc {
 
 		// Create a response map
 		response := map[string]float64{
-			"total_bytes_sent_mb":       float64(totalSent) / 1024 / 1024,
+			"total_bytes_sent_mb":       float64(totalRecv) / 1024 / 1024,
 			"total_bytes_received_mb":   float64(totalRecv) / 1024 / 1024,
+			"total_bytes_sent":          float64(totalRecv),
+			"total_bytes_received":      float64(totalRecv),
 			"current_bytes_sent_mb":     float64(sent) / 1024 / 1024,
 			"current_bytes_received_mb": float64(recv) / 1024 / 1024,
 		}
