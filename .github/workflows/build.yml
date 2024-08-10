@@ -1,4 +1,4 @@
-name: Go Build
+name: Go Build and Release
 
 # 触发条件：推送到 main 分支 或 手动触发工作流
 on:
@@ -21,16 +21,31 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: 1.22.6  # 设置 Go 版本，可以根据需要更改
+          go-version: 1.20  # 设置 Go 版本，可以根据需要更改
 
       # 编译 Go 代码为 Linux 可执行文件
       - name: Build project
         run: |
+          mkdir -p output
           go build -o output/linux_executable
 
-      # 上传构建产物（可选）
-      - name: Upload Build Artifact
-        uses: actions/upload-artifact@v3
+      # 打包构建产物
+      - name: Create release
+        id: create_release
+        uses: actions/create-release@v1
         with:
-          name: linux_executable
-          path: output/linux_executable
+          tag_name: v1.0.${{ github.run_number }}
+          release_name: Release v1.0.${{ github.run_number }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # 上传构建产物到 Release
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: output/linux_executable
+          asset_name: linux_executable
+          asset_content_type: application/octet-stream
