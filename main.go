@@ -71,12 +71,31 @@ func loadOrCreateConfig(configFile string) (Config, error) {
 func saveConfig(configFile string, config Config) error {
 	file, err := os.Create(configFile)
 	if err != nil {
-		return err
+		return fmt.Errorf("error creating config file %s: %v", configFile, err)
 	}
 	defer file.Close()
 
+	// Create a new UTF-8 writer
 	writer := transform.NewWriter(file, unicode.UTF8.NewEncoder())
-	return json.NewEncoder(writer).Encode(config)
+	encoder := json.NewEncoder(writer)
+	encoder.SetIndent("", "  ") // Optional: Format JSON with indentation
+
+	// Encode config and ensure all data is written
+	if err := encoder.Encode(config); err != nil {
+		return fmt.Errorf("error encoding JSON config: %v", err)
+	}
+
+	// Close the writer to flush all buffered data
+	if err := writer.Close(); err != nil {
+		return fmt.Errorf("error closing writer: %v", err)
+	}
+
+	// Sync the file to ensure all data is written to disk
+	if err := file.Sync(); err != nil {
+		return fmt.Errorf("error syncing file: %v", err)
+	}
+
+	return nil
 }
 
 // Load or create the saved traffic data from the data file
@@ -112,12 +131,31 @@ func loadOrCreateTrafficData(dataFile string) (TrafficRecords, error) {
 func saveTrafficData(dataFile string, records TrafficRecords) error {
 	file, err := os.Create(dataFile)
 	if err != nil {
-		return err
+		return fmt.Errorf("error creating file %s: %v", dataFile, err)
 	}
 	defer file.Close()
 
+	// Create a new UTF-8 writer
 	writer := transform.NewWriter(file, unicode.UTF8.NewEncoder())
-	return json.NewEncoder(writer).Encode(records)
+	encoder := json.NewEncoder(writer)
+	encoder.SetIndent("", "  ") // Optional: Format JSON with indentation
+
+	// Encode records and ensure all data is written
+	if err := encoder.Encode(records); err != nil {
+		return fmt.Errorf("error encoding JSON data: %v", err)
+	}
+
+	// Close the writer to flush all buffered data
+	if err := writer.Close(); err != nil {
+		return fmt.Errorf("error closing writer: %v", err)
+	}
+
+	// Sync the file to ensure all data is written to disk
+	if err := file.Sync(); err != nil {
+		return fmt.Errorf("error syncing file: %v", err)
+	}
+
+	return nil
 }
 
 // Get current traffic for all interfaces
@@ -288,6 +326,6 @@ func main() {
 		fmt.Printf("Current Bytes Sent: %.2f MB\nCurrent Bytes Received: %.2f MB\n", float64(sent/1024/1024), float64(recv/1024/1024))
 
 		// Wait for two seconds
-		time.Sleep(2 * time.Second)
+		time.Sleep(3 * time.Second)
 	}
 }
