@@ -270,8 +270,8 @@ func main() {
 		if !exists {
 			data = TrafficData{}
 		}
-		data.TotalBytesSent += sent
-		data.TotalBytesRecv += recv
+		data.TotalBytesSent = sent
+		data.TotalBytesRecv = recv
 		// Update the map with the modified data
 		records[bootTime] = data
 
