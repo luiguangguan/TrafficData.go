@@ -1,58 +1,54 @@
-name: Go Build and Release
+name: Build and Release
 
 on:
   push:
     branches:
       - main
-  workflow_dispatch:  # 允许手动触发
+  workflow_dispatch:
 
 jobs:
   build:
-    name: Build Go Project
-    runs-on: ubuntu-latest  # 在最新的 Ubuntu 环境中运行
+    runs-on: ubuntu-latest
 
     steps:
-      # 检出代码库
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v2
 
-      # 设置 Go 环境
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v2
         with:
-          go-version: 1.22.6  # 设置 Go 版本，可以根据需要更改
+          go-version: '1.18'
 
-      # 检查 Go 版本
-      - name: Check Go version
-        run: go version
+      - name: Cache Go modules
+        uses: actions/cache@v2
+        with:
+          path: |
+            **/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
 
-      # 安装 Go 依赖
-      - name: Install dependencies
-        run: go mod tidy
-
-      # 编译 Go 代码为 Linux 可执行文件
-      - name: Build project
+      - name: Build
         run: |
           mkdir -p output
           go build -o output/linux_executable
 
-      # 创建 GitHub Release
-      - name: Create release
+      - name: Create Release
         id: create_release
         uses: actions/create-release@v1
         with:
-          tag_name: v1.0.${{ github.run_number }}
-          release_name: Release v1.0.${{ github.run_number }}
-          draft: false
-          prerelease: false
+          tag_name: v1.0.0
+          release_name: Release v1.0.0
+          body: Release body
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # 上传构建产物到 Release
       - name: Upload Release Asset
         uses: actions/upload-release-asset@v1
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: output/linux_executable
+          asset_path: ./output/linux_executable
           asset_name: linux_executable
           asset_content_type: application/octet-stream
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
