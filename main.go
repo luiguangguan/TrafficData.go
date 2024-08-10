@@ -174,7 +174,7 @@ func main() {
 
 		// Print the traffic data
 		fmt.Printf("Total Bytes Sent: %.2f, Total Bytes Received: %.2f\n", float64(data.TotalBytesSent/1024/1024), float64(data.TotalBytesRecv/1024/1024))
-		fmt.Printf("Total Bytes Sent: %.2f, Current Bytes Received: %.2f\n", float64(sent/1024/1024), float64(recv/1024/1024))
+		fmt.Printf("Current Bytes Sent: %.2f, Current Bytes Received: %.2f\n", float64(sent/1024/1024), float64(recv/1024/1024))
 
 		// Wait for one minute
 		time.Sleep(2 * time.Second)

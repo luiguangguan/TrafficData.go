@@ -31,7 +31,7 @@ jobs:
     - name: Build
       run: |
         mkdir -p output
-        go build -o output/linux_executable
+        go build -o output/TrafficData
 
     - name: Generate Unique Tag
       id: generate_tag
@@ -51,8 +51,8 @@ jobs:
       uses: actions/upload-release-asset@v1
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./output/linux_executable
-        asset_name: linux_executable
+        asset_path: ./output/TrafficData
+        asset_name: TrafficData
         asset_content_type: application/octet-stream
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
