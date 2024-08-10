@@ -1,0 +1,36 @@
+name: Go Build
+
+# 触发条件：推送到 main 分支 或 手动触发工作流
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  build:
+    name: Build Go Project
+    runs-on: ubuntu-latest  # 在最新的 Ubuntu 环境中运行
+
+    steps:
+      # 检出代码库
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # 设置 Go 环境
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.22.6  # 设置 Go 版本，可以根据需要更改
+
+      # 编译 Go 代码为 Linux 可执行文件
+      - name: Build project
+        run: |
+          go build -o output/linux_executable
+
+      # 上传构建产物（可选）
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: linux_executable
+          path: output/linux_executable
