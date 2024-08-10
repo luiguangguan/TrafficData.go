@@ -1,6 +1,5 @@
 name: Go Build and Release
 
-# 触发条件：推送到 main 分支 或 手动触发工作流
 on:
   push:
     branches:
@@ -23,13 +22,17 @@ jobs:
         with:
           go-version: 1.20  # 设置 Go 版本，可以根据需要更改
 
+      # 安装 Go 依赖
+      - name: Install dependencies
+        run: go mod tidy
+
       # 编译 Go 代码为 Linux 可执行文件
       - name: Build project
         run: |
           mkdir -p output
           go build -o output/linux_executable
 
-      # 打包构建产物
+      # 创建 GitHub Release
       - name: Create release
         id: create_release
         uses: actions/create-release@v1
