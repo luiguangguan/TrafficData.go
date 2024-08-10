@@ -4,24 +4,33 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
+	"os/exec"
+	"runtime"
+	"strings"
 	"time"
 
 	"github.com/shirou/gopsutil/net"
+	"golang.org/x/text/encoding/unicode"
+	"golang.org/x/text/transform"
 )
 
 // Config represents the configuration structure
 type Config struct {
-	ResetDay int    `json:"reset_day"` // 每月几号清零
-	DataFile string `json:"data_file"` // 保存流量信息的文件路径
+	ResetDay      int    `json:"reset_day"`       // 每月几号清零
+	DataFile      string `json:"data_file"`       // 保存流量信息的文件路径
+	LastResetDate string `json:"last_reset_date"` // 最后一次清零的日期
 }
 
 // TrafficData represents the traffic data structure
 type TrafficData struct {
-	TotalBytesSent uint64    `json:"total_bytes_sent"`
-	TotalBytesRecv uint64    `json:"total_bytes_recv"`
-	LastResetDate  time.Time `json:"last_reset_date"`
+	TotalBytesSent uint64 `json:"total_bytes_sent"`
+	TotalBytesRecv uint64 `json:"total_bytes_recv"`
 }
+
+// TrafficRecords represents the traffic records map with boot times as keys
+type TrafficRecords map[string]TrafficData
 
 // Load or create configuration from the config file
 func loadOrCreateConfig(configFile string) (Config, error) {
@@ -30,8 +39,9 @@ func loadOrCreateConfig(configFile string) (Config, error) {
 	if os.IsNotExist(err) {
 		// If the file doesn't exist, create it with default values
 		config = Config{
-			ResetDay: 1,                   // 默认每月1号清零
-			DataFile: "traffic_data.json", // 默认数据文件名
+			ResetDay:      1,                   // 默认每月1号清零
+			DataFile:      "traffic_data.json", // 默认数据文件名
+			LastResetDate: "",                  // 最后一次清零日期初始为空
 		}
 		err = saveConfig(configFile, config)
 		if err != nil {
@@ -46,7 +56,8 @@ func loadOrCreateConfig(configFile string) (Config, error) {
 		}
 		defer file.Close()
 
-		err = json.NewDecoder(file).Decode(&config)
+		decoder := json.NewDecoder(transform.NewReader(file, unicode.UTF8.NewDecoder()))
+		err = decoder.Decode(&config)
 		if err != nil {
 			return config, err
 		}
@@ -62,50 +73,49 @@ func saveConfig(configFile string, config Config) error {
 	}
 	defer file.Close()
 
-	return json.NewEncoder(file).Encode(config)
+	writer := transform.NewWriter(file, unicode.UTF8.NewEncoder())
+	return json.NewEncoder(writer).Encode(config)
 }
 
 // Load or create the saved traffic data from the data file
-func loadOrCreateTrafficData(dataFile string) (TrafficData, error) {
-	var data TrafficData
+func loadOrCreateTrafficData(dataFile string) (TrafficRecords, error) {
+	var records TrafficRecords
 	_, err := os.Stat(dataFile)
 	if os.IsNotExist(err) {
 		// If the file doesn't exist, return default data
-		data = TrafficData{
-			TotalBytesSent: 0,
-			TotalBytesRecv: 0,
-			LastResetDate:  time.Time{},
-		}
-		err = saveTrafficData(dataFile, data)
+		records = TrafficRecords{}
+		err = saveTrafficData(dataFile, records)
 		if err != nil {
-			return data, err
+			return records, err
 		}
 		log.Println("Created new traffic data file.")
 	} else {
 		// If the file exists, load the traffic data
 		file, err := os.Open(dataFile)
 		if err != nil {
-			return data, err
+			return records, err
 		}
 		defer file.Close()
 
-		err = json.NewDecoder(file).Decode(&data)
+		decoder := json.NewDecoder(transform.NewReader(file, unicode.UTF8.NewDecoder()))
+		err = decoder.Decode(&records)
 		if err != nil {
-			return data, err
+			return records, err
 		}
 	}
-	return data, nil
+	return records, nil
 }
 
 // Save the current traffic data to the data file
-func saveTrafficData(dataFile string, data TrafficData) error {
+func saveTrafficData(dataFile string, records TrafficRecords) error {
 	file, err := os.Create(dataFile)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
 
-	return json.NewEncoder(file).Encode(data)
+	writer := transform.NewWriter(file, unicode.UTF8.NewEncoder())
+	return json.NewEncoder(writer).Encode(records)
 }
 
 // Get current traffic for all interfaces
@@ -124,17 +134,91 @@ func getCurrentTraffic() (uint64, uint64, error) {
 	return totalSent, totalRecv, nil
 }
 
-// Check if today is the reset day and if it's time to reset the traffic
-func checkAndResetTraffic(config Config, data *TrafficData) {
-	now := time.Now()
-	resetDate := time.Date(now.Year(), now.Month(), config.ResetDay, 0, 0, 0, 0, now.Location())
+// GetBootTime retrieves the system boot time as a string
+func GetBootTime() (string, error) {
+	var bootTimeStr string
 
-	if now.After(resetDate) && (data.LastResetDate.Before(resetDate) || data.LastResetDate.IsZero()) {
-		// Reset traffic data
-		data.TotalBytesSent = 0
-		data.TotalBytesRecv = 0
-		data.LastResetDate = now
+	if isWindows() {
+		// Use PowerShell command to get system boot time on Windows
+		cmd := exec.Command("powershell", "-Command", "(Get-CimInstance -Class Win32_OperatingSystem).LastBootUpTime")
+		output, err := cmd.Output()
+		if err != nil {
+			return "", fmt.Errorf("error executing PowerShell command: %v", err)
+		}
+		bootTimeStr = strings.TrimSpace(string(output))
+	} else {
+		// Use uptime command to get system boot time on Linux
+		cmd := exec.Command("uptime", "-s")
+		output, err := cmd.Output()
+		if err != nil {
+			return "", fmt.Errorf("error executing uptime command: %v", err)
+		}
+		bootTimeStr = strings.TrimSpace(string(output))
+	}
+
+	return bootTimeStr, nil
+}
+
+// isWindows checks if the operating system is Windows
+func isWindows() bool {
+	return runtime.GOOS == "windows"
+}
+
+// Check if today is the reset day and if it's time to reset the traffic
+func checkAndResetTraffic(config *Config, records *TrafficRecords) error {
+	now := time.Now()
+	resetDate := time.Date(now.Year(), now.Month(), config.ResetDay, 0, 0, 0, 0, time.UTC)
+
+	// Format the current date as a string in the format "YYYY-MM-DD"
+	currentDateStr := now.Format("2006-01-02")
+
+	// Check if today is the reset day and if the reset has not been done today
+	if now.After(resetDate) && config.LastResetDate != currentDateStr {
+		// Clear all traffic records
+		for key := range *records {
+			delete(*records, key)
+		}
+
+		// Update the last reset date in the config
+		config.LastResetDate = currentDateStr
+		err := saveConfig("config.json", *config)
+		if err != nil {
+			return fmt.Errorf("error saving config: %v", err)
+		}
+
+		// Save the updated empty records
+		err = saveTrafficData(config.DataFile, *records)
+		if err != nil {
+			return fmt.Errorf("error saving traffic data: %v", err)
+		}
+
 		log.Println("Traffic data has been reset.")
+	}
+
+	return nil
+}
+
+// Web server to handle traffic queries and return data in JSON format
+func handleGetTotalTraffic(records *TrafficRecords) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var totalSent, totalRecv uint64
+		for _, data := range *records {
+			totalSent += data.TotalBytesSent
+			totalRecv += data.TotalBytesRecv
+		}
+
+		// Create a response map
+		response := map[string]float64{
+			"total_bytes_sent_mb":     float64(totalSent) / 1024 / 1024,
+			"total_bytes_received_mb": float64(totalRecv) / 1024 / 1024,
+		}
+
+		// Encode the response map to JSON and write it to the response
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, "Failed to encode JSON response", http.StatusInternalServerError)
+			log.Printf("Error encoding JSON response: %v", err)
+		}
 	}
 }
 
@@ -146,10 +230,22 @@ func main() {
 	}
 
 	// Load or create saved traffic data
-	data, err := loadOrCreateTrafficData(config.DataFile)
+	records, err := loadOrCreateTrafficData(config.DataFile)
 	if err != nil {
 		log.Fatalf("Error loading or creating traffic data: %v", err)
 	}
+
+	// Check and reset traffic data if necessary
+	err = checkAndResetTraffic(&config, &records)
+	if err != nil {
+		log.Fatalf("Error checking and resetting traffic: %v", err)
+	}
+
+	// Start the web server
+	http.HandleFunc("/total", handleGetTotalTraffic(&records))
+	go func() {
+		log.Fatal(http.ListenAndServe(":8080", nil))
+	}()
 
 	for {
 		// Get current traffic
@@ -159,24 +255,34 @@ func main() {
 			continue
 		}
 
-		// Update total traffic data
+		// Get the system boot time as the key
+		bootTime, err := GetBootTime()
+		if err != nil {
+			log.Printf("Error getting boot time: %v", err)
+			continue
+		}
+
+		// Get a copy of the TrafficData for the current boot time
+		data, exists := records[bootTime]
+		if !exists {
+			data = TrafficData{}
+		}
 		data.TotalBytesSent += sent
 		data.TotalBytesRecv += recv
-
-		// Check and reset traffic if necessary
-		checkAndResetTraffic(config, &data)
+		// Update the map with the modified data
+		records[bootTime] = data
 
 		// Save the updated traffic data
-		err = saveTrafficData(config.DataFile, data)
+		err = saveTrafficData(config.DataFile, records)
 		if err != nil {
 			log.Printf("Error saving traffic data: %v", err)
 		}
 
 		// Print the traffic data
-		fmt.Printf("Total Bytes Sent: %.2f, Total Bytes Received: %.2f\n", float64(data.TotalBytesSent/1024/1024), float64(data.TotalBytesRecv/1024/1024))
-		fmt.Printf("Current Bytes Sent: %.2f, Current Bytes Received: %.2f\n", float64(sent/1024/1024), float64(recv/1024/1024))
+		fmt.Printf("Total Bytes Sent: %.2f MB\nTotal Bytes Received: %.2f MB\n", float64(data.TotalBytesSent/1024/1024), float64(data.TotalBytesRecv/1024/1024))
+		fmt.Printf("Current Bytes Sent: %.2f MB\nCurrent Bytes Received: %.2f MB\n", float64(sent/1024/1024), float64(recv/1024/1024))
 
-		// Wait for one minute
+		// Wait for two seconds
 		time.Sleep(2 * time.Second)
 	}
 }
