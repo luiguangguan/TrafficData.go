@@ -21,6 +21,7 @@ type Config struct {
 	ResetDay      int    `json:"reset_day"`       // 每月几号清零
 	DataFile      string `json:"data_file"`       // 保存流量信息的文件路径
 	LastResetDate string `json:"last_reset_date"` // 最后一次清零的日期
+	Port          int    `json:"port"`            // Web 服务器监听端口
 }
 
 // TrafficData represents the traffic data structure
@@ -42,6 +43,7 @@ func loadOrCreateConfig(configFile string) (Config, error) {
 			ResetDay:      1,                   // 默认每月1号清零
 			DataFile:      "traffic_data.json", // 默认数据文件名
 			LastResetDate: "",                  // 最后一次清零日期初始为空
+			Port:          28080,               // 默认 Web 服务器监听端口
 		}
 		err = saveConfig(configFile, config)
 		if err != nil {
@@ -243,8 +245,9 @@ func main() {
 
 	// Start the web server
 	http.HandleFunc("/total", handleGetTotalTraffic(&records))
+	addr := fmt.Sprintf(":%d", config.Port)
 	go func() {
-		log.Fatal(http.ListenAndServe(":8080", nil))
+		log.Fatal(http.ListenAndServe(addr, nil))
 	}()
 
 	for {
