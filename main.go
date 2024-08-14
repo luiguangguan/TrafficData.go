@@ -22,6 +22,7 @@ type Config struct {
 	DataFile      string `json:"data_file"`       // 保存流量信息的文件路径
 	LastResetDate string `json:"last_reset_date"` // 最后一次清零的日期
 	Port          int    `json:"port"`            // Web 服务器监听端口
+	IfName        string `json:"ifName"`
 }
 
 // TrafficData represents the traffic data structure
@@ -44,6 +45,7 @@ func loadOrCreateConfig(configFile string) (Config, error) {
 			DataFile:      "traffic_data.json", // 默认数据文件名
 			LastResetDate: "",                  // 最后一次清零日期初始为空
 			Port:          28080,               // 默认 Web 服务器监听端口
+			IfName:        "eth0",              // 统计的网卡名称
 		}
 		err = saveConfig(configFile, config)
 		if err != nil {
@@ -151,7 +153,7 @@ func saveTrafficData(dataFile string, records TrafficRecords) error {
 }
 
 // Get current traffic for all interfaces
-func getCurrentTraffic() (uint64, uint64, error) {
+func getCurrentTraffic(ifname *string) (uint64, uint64, error) {
 	interfaces, err := net.IOCounters(true)
 	if err != nil {
 		return 0, 0, err
@@ -159,8 +161,22 @@ func getCurrentTraffic() (uint64, uint64, error) {
 
 	var totalSent, totalRecv uint64
 	for _, iface := range interfaces {
-		totalSent += iface.BytesSent
-		totalRecv += iface.BytesRecv
+		if ifname != nil && *ifname != "" {
+			if *ifname == iface.Name {
+				totalSent += iface.BytesSent
+				totalRecv += iface.BytesRecv
+				println("name:%s", iface.Name)
+				println("Up:%f", iface.BytesSent)
+				println("Down:%f", iface.BytesRecv)
+			}
+		} else {
+			totalSent += iface.BytesSent
+			totalRecv += iface.BytesRecv
+			println("name:%s", iface.Name)
+			println("Up:%f", iface.BytesSent)
+			println("Down:%f", iface.BytesRecv)
+		}
+
 	}
 
 	return totalSent, totalRecv, nil
@@ -231,7 +247,7 @@ func checkAndResetTraffic(config *Config, records *TrafficRecords) error {
 }
 
 // Web server to handle traffic queries and return data in JSON format
-func handleGetTotalTraffic(records *TrafficRecords) http.HandlerFunc {
+func handleGetTotalTraffic(records *TrafficRecords, ifname *string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var totalSent, totalRecv uint64
 		for _, data := range *records {
@@ -241,7 +257,7 @@ func handleGetTotalTraffic(records *TrafficRecords) http.HandlerFunc {
 
 		// Get current traffic
 		var sent, recv int64
-		_sent, _recv, err := getCurrentTraffic()
+		_sent, _recv, err := getCurrentTraffic(ifname)
 		if err != nil {
 			sent = -1
 			recv = -1
@@ -290,7 +306,7 @@ func main() {
 	}
 
 	// Start the web server
-	http.HandleFunc("/total", handleGetTotalTraffic(&records))
+	http.HandleFunc("/total", handleGetTotalTraffic(&records, &config.IfName))
 	addr := fmt.Sprintf(":%d", config.Port)
 	go func() {
 		log.Fatal(http.ListenAndServe(addr, nil))
@@ -298,7 +314,7 @@ func main() {
 
 	for {
 		// Get current traffic
-		sent, recv, err := getCurrentTraffic()
+		sent, recv, err := getCurrentTraffic(&config.IfName)
 		if err != nil {
 			log.Printf("Error getting current traffic: %v", err)
 			continue
