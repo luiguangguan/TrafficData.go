@@ -323,7 +323,7 @@ func main() {
 		// Get the system boot time as the key
 		bootTime, err := GetBootTime()
 		if err != nil {
-			// log.Printf("Error getting boot time: %v", err)
+			log.Printf("Error getting boot time: %v", err)
 			continue
 		}
 
@@ -337,7 +337,7 @@ func main() {
 		// Update the map with the modified data
 		records[bootTime] = data
 
-		log.Printf("\ntime:%s", bootTime)
+		// log.Printf("\ntime:%s", bootTime)
 
 		// Save the updated traffic data
 		err = saveTrafficData(config.DataFile, records)
