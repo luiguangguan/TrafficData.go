@@ -323,7 +323,7 @@ func main() {
 		// Get the system boot time as the key
 		bootTime, err := GetBootTime()
 		if err != nil {
-			log.Printf("Error getting boot time: %v", err)
+			// log.Printf("Error getting boot time: %v", err)
 			continue
 		}
 
