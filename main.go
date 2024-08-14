@@ -163,15 +163,15 @@ func getCurrentTraffic(ifname *string) (uint64, uint64, error) {
 	for _, iface := range interfaces {
 		if ifname != nil && *ifname != "" {
 			if *ifname == iface.Name {
-				totalSent += iface.BytesSent
-				totalRecv += iface.BytesRecv
+				totalSent = iface.BytesSent
+				totalRecv = iface.BytesRecv
 				println("name:%s", iface.Name)
 				println("Up:%f", iface.BytesSent)
 				println("Down:%f", iface.BytesRecv)
 			}
 		} else {
-			totalSent += iface.BytesSent
-			totalRecv += iface.BytesRecv
+			totalSent = iface.BytesSent
+			totalRecv = iface.BytesRecv
 			println("name:%s", iface.Name)
 			println("Up:%f", iface.BytesSent)
 			println("Down:%f", iface.BytesRecv)
