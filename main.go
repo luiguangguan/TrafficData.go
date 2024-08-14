@@ -165,16 +165,16 @@ func getCurrentTraffic(ifname *string) (uint64, uint64, error) {
 			if *ifname == iface.Name {
 				totalSent += iface.BytesSent
 				totalRecv += iface.BytesRecv
-				println("name:%s", iface.Name)
-				println("Up:%f", iface.BytesSent)
-				println("Down:%f", iface.BytesRecv)
+				// println("name:%s", iface.Name)
+				// println("Up:%f", iface.BytesSent)
+				// println("Down:%f", iface.BytesRecv)
 			}
 		} else {
 			totalSent += iface.BytesSent
 			totalRecv += iface.BytesRecv
-			println("name:%s", iface.Name)
-			println("Up:%f", iface.BytesSent)
-			println("Down:%f", iface.BytesRecv)
+			// println("name:%s", iface.Name)
+			// println("Up:%f", iface.BytesSent)
+			// println("Down:%f", iface.BytesRecv)
 		}
 
 	}
@@ -346,8 +346,8 @@ func main() {
 		}
 
 		// Print the traffic data
-		fmt.Printf("Total Bytes Sent: %.2f MB\nTotal Bytes Received: %.2f MB\n", float64(data.TotalBytesSent/1024/1024), float64(data.TotalBytesRecv/1024/1024))
-		fmt.Printf("Current Bytes Sent: %.2f MB\nCurrent Bytes Received: %.2f MB\n", float64(sent/1024/1024), float64(recv/1024/1024))
+		// fmt.Printf("Total Bytes Sent: %.2f MB\nTotal Bytes Received: %.2f MB\n", float64(data.TotalBytesSent/1024/1024), float64(data.TotalBytesRecv/1024/1024))
+		// fmt.Printf("Current Bytes Sent: %.2f MB\nCurrent Bytes Received: %.2f MB\n", float64(sent/1024/1024), float64(recv/1024/1024))
 
 		// Wait for two seconds
 		time.Sleep(3 * time.Second)
