@@ -31,6 +31,9 @@ type TrafficData struct {
 	TotalBytesRecv uint64 `json:"total_bytes_recv"`
 }
 
+var recTotal uint64 = 0
+var senTotal uint64 = 0
+
 // TrafficRecords represents the traffic records map with boot times as keys
 type TrafficRecords map[string]TrafficData
 
@@ -179,6 +182,9 @@ func getCurrentTraffic(ifname *string) (uint64, uint64, error) {
 
 	}
 
+	senTotal = totalSent
+	recTotal = totalRecv
+
 	return totalSent, totalRecv, nil
 }
 
@@ -234,6 +240,18 @@ func checkAndResetTraffic(config *Config, records *TrafficRecords) error {
 			return fmt.Errorf("error saving config: %v", err)
 		}
 
+		if recTotal > 0 || senTotal > 0 {
+			// Get a copy of the TrafficData for the current boot time
+			data, exists := (*records)["resetSum"]
+			if !exists {
+				data = TrafficData{}
+			}
+			data.TotalBytesSent = senTotal
+			data.TotalBytesRecv = recTotal
+			// Update the map with the modified data
+			(*records)["resetSum"] = data
+		}
+
 		// Save the updated empty records
 		err = saveTrafficData(config.DataFile, *records)
 		if err != nil {
@@ -249,11 +267,18 @@ func checkAndResetTraffic(config *Config, records *TrafficRecords) error {
 // Web server to handle traffic queries and return data in JSON format
 func handleGetTotalTraffic(records *TrafficRecords, ifname *string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var totalSent, totalRecv uint64
-		for _, data := range *records {
-			totalSent += data.TotalBytesSent
-			totalRecv += data.TotalBytesRecv
+		var totalSent, totalRecv, resetSent, resetRecv uint64
+		for key, data := range *records {
+			if key == "resetSum" {
+				resetSent = data.TotalBytesSent
+				resetRecv = data.TotalBytesRecv
+			} else {
+				totalSent += data.TotalBytesSent
+				totalRecv += data.TotalBytesRecv
+			}
 		}
+		totalSent -= resetSent
+		totalRecv -= resetRecv
 
 		// Get current traffic
 		var sent, recv int64
@@ -299,12 +324,6 @@ func main() {
 		log.Fatalf("Error loading or creating traffic data: %v", err)
 	}
 
-	// Check and reset traffic data if necessary
-	err = checkAndResetTraffic(&config, &records)
-	if err != nil {
-		log.Fatalf("Error checking and resetting traffic: %v", err)
-	}
-
 	// Start the web server
 	http.HandleFunc("/total", handleGetTotalTraffic(&records, &config.IfName))
 	addr := fmt.Sprintf(":%d", config.Port)
@@ -343,6 +362,12 @@ func main() {
 		err = saveTrafficData(config.DataFile, records)
 		if err != nil {
 			log.Printf("Error saving traffic data: %v", err)
+		}
+
+		// Check and reset traffic data if necessary
+		err = checkAndResetTraffic(&config, &records)
+		if err != nil {
+			log.Fatalf("Error checking and resetting traffic: %v", err)
 		}
 
 		// Print the traffic data
