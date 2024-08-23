@@ -220,18 +220,25 @@ func isWindows() bool {
 
 // Check if today is the reset day and if it's time to reset the traffic
 func checkAndResetTraffic(config *Config, records *TrafficRecords) error {
+	// log.Println("reset reset reset reset reset reset???")
+
 	now := time.Now()
 	resetDate := time.Date(now.Year(), now.Month(), config.ResetDay, 0, 0, 0, 0, time.UTC)
 
 	// Format the current date as a string in the format "YYYY-MM-DD"
 	currentDateStr := now.Format("2006-01-02")
 
+	layout := "2006-01-02"
+	lastRestday, _ := time.Parse(layout, config.LastResetDate)
+
 	// Check if today is the reset day and if the reset has not been done today
-	if now.After(resetDate) && config.LastResetDate != currentDateStr {
+	if now.After(resetDate) && resetDate.After(lastRestday) {
 		// Clear all traffic records
 		for key := range *records {
 			delete(*records, key)
 		}
+
+		// log.Println("reset reset reset reset reset reset!!!!")
 
 		// Update the last reset date in the config
 		config.LastResetDate = currentDateStr
@@ -309,6 +316,12 @@ func handleGetTotalTraffic(records *TrafficRecords, ifname *string) http.Handler
 			log.Printf("Error encoding JSON response: %v", err)
 		}
 	}
+}
+
+func isSameDate(t1, t2 time.Time) bool {
+	return t1.Year() == t2.Year() &&
+		t1.Month() == t2.Month() &&
+		t1.Day() == t2.Day()
 }
 
 func main() {
